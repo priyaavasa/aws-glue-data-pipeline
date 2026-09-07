@@ -1,4 +1,4 @@
-name: Destroy CFN Verification Pipeline
+name: Destroy Pipeline
 
 on:
   workflow_dispatch:
@@ -38,23 +38,35 @@ jobs:
             --stack-name ${PIPELINE_STACK_NAME} \
             --region ${AWS_REGION}
 
-      - name: Empty CFN input bucket
+            - name: Empty CFN input bucket
         run: |
-          aws s3 rm s3://${INPUT_BUCKET} \
-            --recursive \
-            --region ${AWS_REGION}
+          if aws s3api head-bucket --bucket ${INPUT_BUCKET} --region ${AWS_REGION} 2>/dev/null; then
+            aws s3 rm s3://${INPUT_BUCKET} \
+              --recursive \
+              --region ${AWS_REGION}
+          else
+            echo "Input bucket already deleted. Skipping."
+          fi
 
       - name: Empty CFN scripts bucket
         run: |
-          aws s3 rm s3://${SCRIPTS_BUCKET} \
-            --recursive \
-            --region ${AWS_REGION}
+          if aws s3api head-bucket --bucket ${SCRIPTS_BUCKET} --region ${AWS_REGION} 2>/dev/null; then
+            aws s3 rm s3://${SCRIPTS_BUCKET} \
+              --recursive \
+              --region ${AWS_REGION}
+          else
+            echo "Scripts bucket already deleted. Skipping."
+          fi
 
       - name: Empty CFN output bucket
         run: |
-          aws s3 rm s3://${OUTPUT_BUCKET} \
-            --recursive \
-            --region ${AWS_REGION}
+          if aws s3api head-bucket --bucket ${OUTPUT_BUCKET} --region ${AWS_REGION} 2>/dev/null; then
+            aws s3 rm s3://${OUTPUT_BUCKET} \
+              --recursive \
+              --region ${AWS_REGION}
+          else
+            echo "Output bucket already deleted. Skipping."
+          fi
 
       - name: Delete storage stack
         run: |
