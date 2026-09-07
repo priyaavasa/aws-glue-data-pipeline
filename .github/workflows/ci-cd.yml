@@ -1,0 +1,69 @@
+name: Deploy AWS Pipeline
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  STACK_NAME: sales-pipeline-stack
+  SCRIPTS_BUCKET: priya-glue-scripts-2026
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::719287408908:role/GitHubActionsDeployRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Package Lambda
+        run: |
+          cd lambda
+          zip -j lambda_function.zip lambda_function.py
+
+      - name: Upload Lambda package
+        run: |
+          aws s3 cp \
+            lambda/lambda_function.zip \
+            s3://${SCRIPTS_BUCKET}/lambda/lambda_function.zip
+
+      - name: Upload Glue script
+        run: |
+          aws s3 cp \
+            glue/sales_transformation.py \
+            s3://${SCRIPTS_BUCKET}/glue/sales_transformation.py
+
+      - name: Validate CloudFormation template
+        run: |
+          aws cloudformation validate-template \
+            --template-body file://cloudformation/template.yaml
+
+      - name: Deploy CloudFormation stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation/template.yaml \
+            --stack-name ${STACK_NAME} \
+            --region ${AWS_REGION} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              InputBucketName=priya-glue-input-2026 \
+              OutputBucketName=priya-glue-output-2026 \
+              ScriptsBucketName=priya-glue-scripts-2026 \
+              WorkflowName=sales-pipeline-workflow \
+              CrawlerName=sales-input-crawler \
+              JobName=sales-transformation-job \
+              DatabaseName=sales_pipeline_db
+
+      - name: Deployment completed
+        run: |
+          echo "AWS pipeline deployment completed successfully."

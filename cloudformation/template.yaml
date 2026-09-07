@@ -1,0 +1,387 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  Event-driven AWS data pipeline using S3, Lambda, AWS Glue Workflow,
+  Glue Crawler, Glue Data Catalog, and Glue Python Shell transformation.
+
+Parameters:
+
+  InputBucketName:
+    Type: String
+    Default: priya-glue-input-2026
+
+  OutputBucketName:
+    Type: String
+    Default: priya-glue-output-2026
+
+  ScriptsBucketName:
+    Type: String
+    Default: priya-glue-scripts-2026
+
+  WorkflowName:
+    Type: String
+    Default: sales-pipeline-workflow
+
+  CrawlerName:
+    Type: String
+    Default: sales-input-crawler
+
+  JobName:
+    Type: String
+    Default: sales-transformation-job
+
+  DatabaseName:
+    Type: String
+    Default: sales_pipeline_db
+
+
+Resources:
+
+  GlueCrawlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AWSGlueServiceRole-SalesCrawler
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - glue.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: SalesCrawlerInputS3Read
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${InputBucketName}'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${InputBucketName}/*'
+
+
+  GlueJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AWSGlueServiceRole-SalesJob
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - glue.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: SalesJobS3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${InputBucketName}'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${InputBucketName}/*'
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${ScriptsBucketName}'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${ScriptsBucketName}/*'
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${OutputBucketName}/*'
+
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AWSLambdaServiceRole-SalesPipeline
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: StartSalesPipelineWorkflow
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - glue:StartWorkflowRun
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:workflow/${WorkflowName}'
+
+
+  SalesPipelineLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: sales-pipeline-trigger
+      Runtime: python3.12
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      Code:
+        S3Bucket: !Ref ScriptsBucketName
+        S3Key: lambda/lambda_function.zip
+
+
+  AllowS3InvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref SalesPipelineLambda
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:s3:::${InputBucketName}'
+
+
+  InputBucketNotification:
+    Type: Custom::S3Notification
+    DependsOn:
+      - AllowS3InvokeLambda
+    Properties:
+      ServiceToken: !GetAtt S3NotificationFunction.Arn
+      BucketName: !Ref InputBucketName
+      LambdaArn: !GetAtt SalesPipelineLambda.Arn
+
+
+  S3NotificationFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ConfigureS3Notification
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetBucketNotification
+                  - s3:PutBucketNotification
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${InputBucketName}'
+
+
+  S3NotificationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt S3NotificationFunctionRole.Arn
+      Timeout: 60
+      Code:
+        ZipFile: |
+          import json
+          import urllib.request
+          import boto3
+
+          s3 = boto3.client("s3")
+
+          def send_response(event, context, status, data):
+              response_body = json.dumps({
+                  "Status": status,
+                  "Reason": "See CloudWatch Logs",
+                  "PhysicalResourceId": context.log_stream_name,
+                  "StackId": event["StackId"],
+                  "RequestId": event["RequestId"],
+                  "LogicalResourceId": event["LogicalResourceId"],
+                  "Data": data
+              })
+
+              request = urllib.request.Request(
+                  event["ResponseURL"],
+                  data=response_body.encode("utf-8"),
+                  headers={"content-type": ""},
+                  method="PUT"
+              )
+
+              urllib.request.urlopen(request)
+
+          def handler(event, context):
+              bucket = event["ResourceProperties"]["BucketName"]
+              lambda_arn = event["ResourceProperties"]["LambdaArn"]
+
+              try:
+                  if event["RequestType"] == "Delete":
+                      s3.put_bucket_notification_configuration(
+                          Bucket=bucket,
+                          NotificationConfiguration={}
+                      )
+                  else:
+                      s3.put_bucket_notification_configuration(
+                          Bucket=bucket,
+                          NotificationConfiguration={
+                              "LambdaFunctionConfigurations": [
+                                  {
+                                      "LambdaFunctionArn": lambda_arn,
+                                      "Events": ["s3:ObjectCreated:*"]
+                                  }
+                              ]
+                          }
+                      )
+
+                  send_response(event, context, "SUCCESS", {})
+
+              except Exception as error:
+                  send_response(
+                      event,
+                      context,
+                      "FAILED",
+                      {"Error": str(error)}
+                  )
+
+
+  SalesDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Ref DatabaseName
+        Description: Data Catalog database for the sales pipeline.
+
+
+  SalesCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Ref CrawlerName
+      Role: !GetAtt GlueCrawlerRole.Arn
+      DatabaseName: !Ref DatabaseName
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://${InputBucketName}/'
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: LOG
+      RecrawlPolicy:
+        RecrawlBehavior: CRAWL_EVERYTHING
+
+
+  SalesTransformationJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Ref JobName
+      Role: !GetAtt GlueJobRole.Arn
+      GlueVersion: '4.0'
+      Command:
+        Name: pythonshell
+        PythonVersion: '3.9'
+        ScriptLocation: !Sub 's3://${ScriptsBucketName}/glue/sales_transformation.py'
+      DefaultArguments:
+        '--WORKFLOW_NAME': !Ref WorkflowName
+        '--job-language': python
+        '--enable-metrics': ''
+      MaxCapacity: 0.0625
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+      Description: >
+        Python Shell job that transforms sales CSV data and writes
+        processed output to S3.
+
+
+  SalesWorkflow:
+    Type: AWS::Glue::Workflow
+    Properties:
+      Name: !Ref WorkflowName
+      Description: Event-driven sales data processing workflow.
+
+
+  StartCrawlerTrigger:
+    Type: AWS::Glue::Trigger
+    Properties:
+      Name: start-sales-crawler
+      Type: ON_DEMAND
+      WorkflowName: !Ref WorkflowName
+      Actions:
+        - CrawlerName: !Ref CrawlerName
+
+
+  CrawlerSuccessTrigger:
+    Type: AWS::Glue::Trigger
+    Properties:
+      Name: crawler-success-start-job
+      Type: CONDITIONAL
+      StartOnCreation: true
+      WorkflowName: !Ref WorkflowName
+      Predicate:
+        Logical: AND
+        Conditions:
+          - LogicalOperator: EQUALS
+            CrawlState: SUCCEEDED
+            CrawlerName: !Ref CrawlerName
+      Actions:
+        - JobName: !Ref JobName
+
+
+Outputs:
+
+  InputBucket:
+    Description: Input S3 bucket
+    Value: !Ref InputBucketName
+
+  OutputBucket:
+    Description: Output S3 bucket
+    Value: !Ref OutputBucketName
+
+  ScriptsBucket:
+    Description: Scripts S3 bucket
+    Value: !Ref ScriptsBucketName
+
+  LambdaFunction:
+    Description: Lambda pipeline trigger
+    Value: !Ref SalesPipelineLambda
+
+  GlueDatabase:
+    Description: Glue Data Catalog database
+    Value: !Ref SalesDatabase
+
+  GlueCrawler:
+    Description: Glue crawler
+    Value: !Ref SalesCrawler
+
+  GlueJob:
+    Description: Glue transformation job
+    Value: !Ref SalesTransformationJob
+
+  GlueWorkflow:
+    Description: Glue workflow
+    Value: !Ref SalesWorkflow
