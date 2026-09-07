@@ -9,8 +9,11 @@ permissions:
 
 env:
   AWS_REGION: ap-south-1
-  STACK_NAME: sales-pipeline-stack
-  SCRIPTS_BUCKET: priya-glue-scripts-2026
+  STORAGE_STACK_NAME: sales-cfn-storage-stack
+  PIPELINE_STACK_NAME: sales-cfn-pipeline-stack
+  INPUT_BUCKET: priya-cfn-glue-input-2026
+  OUTPUT_BUCKET: priya-cfn-glue-output-2026
+  SCRIPTS_BUCKET: priya-cfn-glue-scripts-2026
 
 jobs:
   deploy:
@@ -25,6 +28,18 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::719287408908:role/GitHubActionsDeployRole
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy S3 storage stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation/storage.yaml \
+            --stack-name ${STORAGE_STACK_NAME} \
+            --region ${AWS_REGION} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              InputBucketName=${INPUT_BUCKET} \
+              OutputBucketName=${OUTPUT_BUCKET} \
+              ScriptsBucketName=${SCRIPTS_BUCKET}
 
       - name: Package Lambda
         run: |
@@ -48,22 +63,22 @@ jobs:
           aws cloudformation validate-template \
             --template-body file://cloudformation/template.yaml
 
-      - name: Deploy CloudFormation stack
+      - name: Deploy pipeline stack
         run: |
           aws cloudformation deploy \
             --template-file cloudformation/template.yaml \
-            --stack-name ${STACK_NAME} \
+            --stack-name ${PIPELINE_STACK_NAME} \
             --region ${AWS_REGION} \
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides \
-              InputBucketName=priya-glue-input-2026 \
-              OutputBucketName=priya-glue-output-2026 \
-              ScriptsBucketName=priya-glue-scripts-2026 \
-              WorkflowName=sales-pipeline-workflow \
-              CrawlerName=sales-input-crawler \
-              JobName=sales-transformation-job \
-              DatabaseName=sales_pipeline_db
+              InputBucketName=${INPUT_BUCKET} \
+              OutputBucketName=${OUTPUT_BUCKET} \
+              ScriptsBucketName=${SCRIPTS_BUCKET} \
+              WorkflowName=sales-cfn-pipeline-workflow \
+              CrawlerName=sales-cfn-input-crawler \
+              JobName=sales-cfn-transformation-job \
+              DatabaseName=sales_cfn_pipeline_db
 
       - name: Deployment completed
         run: |
-          echo "AWS pipeline deployment completed successfully."
+          echo "CloudFormation verification pipeline deployed successfully."

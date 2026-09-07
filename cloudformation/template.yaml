@@ -8,31 +8,31 @@ Parameters:
 
   InputBucketName:
     Type: String
-    Default: priya-glue-input-2026
+    Default: priya-cfn-glue-input-2026
 
   OutputBucketName:
     Type: String
-    Default: priya-glue-output-2026
+    Default: priya-cfn-glue-output-2026
 
   ScriptsBucketName:
     Type: String
-    Default: priya-glue-scripts-2026
+    Default: priya-cfn-glue-scripts-2026
 
   WorkflowName:
     Type: String
-    Default: sales-pipeline-workflow
+    Default: sales-cfn-pipeline-workflow
 
   CrawlerName:
     Type: String
-    Default: sales-input-crawler
+    Default: sales-cfn-input-crawler
 
   JobName:
     Type: String
-    Default: sales-transformation-job
+    Default: sales-cfn-transformation-job
 
   DatabaseName:
     Type: String
-    Default: sales_pipeline_db
+    Default: sales_cfn_pipeline_db
 
 
 Resources:
@@ -40,7 +40,7 @@ Resources:
   GlueCrawlerRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: AWSGlueServiceRole-SalesCrawler
+      RoleName: AWSGlueServiceRole-SalesCfnCrawler
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -53,7 +53,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
       Policies:
-        - PolicyName: SalesCrawlerInputS3Read
+        - PolicyName: SalesCfnCrawlerInputS3Read
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -72,7 +72,7 @@ Resources:
   GlueJobRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: AWSGlueServiceRole-SalesJob
+      RoleName: AWSGlueServiceRole-SalesCfnJob
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -85,7 +85,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
       Policies:
-        - PolicyName: SalesJobS3Access
+        - PolicyName: SalesCfnJobS3Access
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -94,21 +94,25 @@ Resources:
                   - s3:ListBucket
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:s3:::${InputBucketName}'
+
               - Effect: Allow
                 Action:
                   - s3:GetObject
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:s3:::${InputBucketName}/*'
+
               - Effect: Allow
                 Action:
                   - s3:ListBucket
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:s3:::${ScriptsBucketName}'
+
               - Effect: Allow
                 Action:
                   - s3:GetObject
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:s3:::${ScriptsBucketName}/*'
+
               - Effect: Allow
                 Action:
                   - s3:PutObject
@@ -119,7 +123,7 @@ Resources:
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: AWSLambdaServiceRole-SalesPipeline
+      RoleName: AWSLambdaServiceRole-SalesCfnPipeline
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -132,7 +136,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
-        - PolicyName: StartSalesPipelineWorkflow
+        - PolicyName: StartSalesCfnPipelineWorkflow
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -146,7 +150,7 @@ Resources:
   SalesPipelineLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: sales-pipeline-trigger
+      FunctionName: sales-cfn-pipeline-trigger
       Runtime: python3.12
       Handler: lambda_function.lambda_handler
       Role: !GetAtt LambdaExecutionRole.Arn
@@ -178,6 +182,7 @@ Resources:
   S3NotificationFunctionRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: AWSLambdaServiceRole-S3Notification
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -277,7 +282,7 @@ Resources:
       CatalogId: !Ref AWS::AccountId
       DatabaseInput:
         Name: !Ref DatabaseName
-        Description: Data Catalog database for the sales pipeline.
+        Description: Data Catalog database for the CloudFormation sales pipeline.
 
 
   SalesCrawler:
@@ -322,13 +327,13 @@ Resources:
     Type: AWS::Glue::Workflow
     Properties:
       Name: !Ref WorkflowName
-      Description: Event-driven sales data processing workflow.
+      Description: Event-driven CloudFormation sales data processing workflow.
 
 
   StartCrawlerTrigger:
     Type: AWS::Glue::Trigger
     Properties:
-      Name: start-sales-crawler
+      Name: sales-cfn-start-crawler
       Type: ON_DEMAND
       WorkflowName: !Ref WorkflowName
       Actions:
@@ -338,7 +343,7 @@ Resources:
   CrawlerSuccessTrigger:
     Type: AWS::Glue::Trigger
     Properties:
-      Name: crawler-success-start-job
+      Name: sales-cfn-crawler-success-start-job
       Type: CONDITIONAL
       StartOnCreation: true
       WorkflowName: !Ref WorkflowName
@@ -355,19 +360,19 @@ Resources:
 Outputs:
 
   InputBucket:
-    Description: Input S3 bucket
+    Description: CloudFormation input S3 bucket
     Value: !Ref InputBucketName
 
   OutputBucket:
-    Description: Output S3 bucket
+    Description: CloudFormation output S3 bucket
     Value: !Ref OutputBucketName
 
   ScriptsBucket:
-    Description: Scripts S3 bucket
+    Description: CloudFormation scripts S3 bucket
     Value: !Ref ScriptsBucketName
 
   LambdaFunction:
-    Description: Lambda pipeline trigger
+    Description: CloudFormation Lambda pipeline trigger
     Value: !Ref SalesPipelineLambda
 
   GlueDatabase:

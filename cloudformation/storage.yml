@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  S3 storage resources for the CloudFormation AWS Glue data pipeline.
+
+Parameters:
+
+  InputBucketName:
+    Type: String
+    Default: priya-cfn-glue-input-2026
+
+  OutputBucketName:
+    Type: String
+    Default: priya-cfn-glue-output-2026
+
+  ScriptsBucketName:
+    Type: String
+    Default: priya-cfn-glue-scripts-2026
+
+
+Resources:
+
+  InputBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Ref InputBucketName
+
+
+  OutputBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Ref OutputBucketName
+
+
+  ScriptsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Ref ScriptsBucketName
+
+
+Outputs:
+
+  InputBucketName:
+    Description: CloudFormation input bucket
+    Value: !Ref InputBucket
+
+  OutputBucketName:
+    Description: CloudFormation output bucket
+    Value: !Ref OutputBucket
+
+  ScriptsBucketName:
+    Description: CloudFormation scripts bucket
+    Value: !Ref ScriptsBucket
