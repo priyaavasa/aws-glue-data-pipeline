@@ -11,6 +11,9 @@ env:
   AWS_REGION: ap-south-1
   PIPELINE_STACK_NAME: sales-cfn-pipeline-stack
   STORAGE_STACK_NAME: sales-cfn-storage-stack
+  INPUT_BUCKET: priya-cfn-glue-input-2026
+  OUTPUT_BUCKET: priya-cfn-glue-output-2026
+  SCRIPTS_BUCKET: priya-cfn-glue-scripts-2026
 
 jobs:
   destroy:
@@ -33,6 +36,24 @@ jobs:
         run: |
           aws cloudformation wait stack-delete-complete \
             --stack-name ${PIPELINE_STACK_NAME} \
+            --region ${AWS_REGION}
+
+      - name: Empty CFN input bucket
+        run: |
+          aws s3 rm s3://${INPUT_BUCKET} \
+            --recursive \
+            --region ${AWS_REGION}
+
+      - name: Empty CFN scripts bucket
+        run: |
+          aws s3 rm s3://${SCRIPTS_BUCKET} \
+            --recursive \
+            --region ${AWS_REGION}
+
+      - name: Empty CFN output bucket
+        run: |
+          aws s3 rm s3://${OUTPUT_BUCKET} \
+            --recursive \
             --region ${AWS_REGION}
 
       - name: Delete storage stack
