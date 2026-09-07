@@ -1,4 +1,4 @@
-name: Destroy AWS Pipeline
+name: Destroy CFN Verification Pipeline
 
 on:
   workflow_dispatch:
@@ -9,7 +9,8 @@ permissions:
 
 env:
   AWS_REGION: ap-south-1
-  STACK_NAME: sales-pipeline-stack
+  PIPELINE_STACK_NAME: sales-cfn-pipeline-stack
+  STORAGE_STACK_NAME: sales-cfn-storage-stack
 
 jobs:
   destroy:
@@ -22,18 +23,30 @@ jobs:
           role-to-assume: arn:aws:iam::719287408908:role/GitHubActionsDeployRole
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Delete CloudFormation stack
+      - name: Delete pipeline stack
         run: |
           aws cloudformation delete-stack \
-            --stack-name ${STACK_NAME} \
+            --stack-name ${PIPELINE_STACK_NAME} \
             --region ${AWS_REGION}
 
-      - name: Wait for stack deletion
+      - name: Wait for pipeline stack deletion
         run: |
           aws cloudformation wait stack-delete-complete \
-            --stack-name ${STACK_NAME} \
+            --stack-name ${PIPELINE_STACK_NAME} \
+            --region ${AWS_REGION}
+
+      - name: Delete storage stack
+        run: |
+          aws cloudformation delete-stack \
+            --stack-name ${STORAGE_STACK_NAME} \
+            --region ${AWS_REGION}
+
+      - name: Wait for storage stack deletion
+        run: |
+          aws cloudformation wait stack-delete-complete \
+            --stack-name ${STORAGE_STACK_NAME} \
             --region ${AWS_REGION}
 
       - name: Destroy completed
         run: |
-          echo "CloudFormation stack deleted successfully."
+          echo "CloudFormation verification environment deleted successfully."

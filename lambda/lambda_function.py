@@ -3,8 +3,8 @@ import urllib.parse
 
 glue = boto3.client("glue")
 
-WORKFLOW_NAME = "sales-pipeline-workflow"
-OUTPUT_BUCKET = "priya-glue-output-2026"
+WORKFLOW_NAME = "sales-cfn-pipeline-workflow"
+OUTPUT_BUCKET = "priya-cfn-glue-output-2026"
 
 
 def lambda_handler(event, context):
