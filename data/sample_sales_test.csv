@@ -1,0 +1,16 @@
+order_id,customer_name,product,category,quantity,unit_price,status,order_date,city
+1001, john smith ,Laptop,Electronics,1,850.0,completed,2026-09-01,Bengaluru
+1002,Sarah Lee,Keyboard,Electronics,2,45.0,COMPLETED,2026-09-01,Mumbai
+1003,david kumar,Monitor,Electronics,1,275.5,pending,2026-09-02,Hyderabad
+1004,Emma Wilson,Mouse,Accessories,3,25.0,Completed,2026-09-02,Chennai
+1005, Michael Brown,USB Hub,Accessories,2,30.0,PENDING,2026-09-03,Delhi
+1006,Priya Nair,Webcam,Accessories,1,65.0,completed,2026-09-03,Bengaluru
+1007,  Arjun Rao,Desk Chair,Furniture,1,180.0,shipped,2026-09-04,Pune
+1008,Neha Sharma ,Standing Desk,Furniture,1,320.0,COMPLETED,2026-09-04,Mumbai
+1009,Rahul Mehta,Headphones,Electronics,2,75.0,pending,2026-09-05,Delhi
+1010,Ananya Das,Keyboard,Electronics,1,55.0,shipped,2026-09-05,Kolkata
+1011,Vikram Singh,Monitor,Electronics,2,250.0,completed,2026-09-06,Jaipur
+1012,Sneha Iyer,Mouse Pad,Accessories,4,15.0,PENDING,2026-09-06,Bengaluru
+1013,Karan Patel,Laptop Stand,Accessories,2,40.0,completed,2026-09-07,Ahmedabad
+1014,Riya Kapoor,Office Table,Furniture,1,210.0,shipped,2026-09-07,Pune
+1015,Amit Verma,Laptop,Electronics,1,920.0,COMPLETED,2026-09-07,Hyderabad
