@@ -177,7 +177,6 @@ Resources:
       ServiceToken: !GetAtt S3NotificationFunction.Arn
       BucketName: !Ref InputBucketName
       LambdaArn: !GetAtt SalesPipelineLambda.Arn
-      NotificationVersion: '2'
 
 
   S3NotificationFunctionRole:

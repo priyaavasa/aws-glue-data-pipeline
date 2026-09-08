@@ -79,13 +79,6 @@ jobs:
               JobName=sales-cfn-transformation-job \
               DatabaseName=sales_cfn_pipeline_db
 
-      - name: Upload data files
-        run: |
-          for file in data/*; do
-            if [ -f "$file" ]; then
-              aws s3 cp "$file" "s3://${INPUT_BUCKET}/"
-            fi
-          done
 
       - name: Deployment completed
         run: |
