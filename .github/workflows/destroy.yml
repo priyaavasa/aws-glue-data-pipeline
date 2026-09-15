@@ -10,6 +10,7 @@ permissions:
 env:
   AWS_REGION: ap-south-1
   STORAGE_STACK_NAME: sales-cfn-storage-stack
+  PIPELINE_STACK_NAME: sales-cfn-pipeline-stack
   INPUT_BUCKET: priya-cfn-glue-input-2026
   OUTPUT_BUCKET: priya-cfn-glue-output-2026
   SCRIPTS_BUCKET: priya-cfn-glue-scripts-2026
@@ -27,41 +28,96 @@ jobs:
 
       - name: Empty CFN input bucket
         run: |
-          if aws s3api head-bucket --bucket ${INPUT_BUCKET} --region ${AWS_REGION} 2>/dev/null; then
-            aws s3 rm s3://${INPUT_BUCKET} \
+          if aws s3api head-bucket \
+            --bucket ${INPUT_BUCKET} \
+            --region ${AWS_REGION} 2>/dev/null; then
+
+            aws s3 rm \
+              s3://${INPUT_BUCKET} \
               --recursive \
               --region ${AWS_REGION}
+
           else
             echo "Input bucket already deleted. Skipping."
           fi
 
       - name: Empty CFN scripts bucket
         run: |
-          if aws s3api head-bucket --bucket ${SCRIPTS_BUCKET} --region ${AWS_REGION} 2>/dev/null; then
-            aws s3 rm s3://${SCRIPTS_BUCKET} \
+          if aws s3api head-bucket \
+            --bucket ${SCRIPTS_BUCKET} \
+            --region ${AWS_REGION} 2>/dev/null; then
+
+            aws s3 rm \
+              s3://${SCRIPTS_BUCKET} \
               --recursive \
               --region ${AWS_REGION}
+
           else
             echo "Scripts bucket already deleted. Skipping."
           fi
 
       - name: Empty CFN output bucket
         run: |
-          if aws s3api head-bucket --bucket ${OUTPUT_BUCKET} --region ${AWS_REGION} 2>/dev/null; then
-            aws s3 rm s3://${OUTPUT_BUCKET} \
+          if aws s3api head-bucket \
+            --bucket ${OUTPUT_BUCKET} \
+            --region ${AWS_REGION} 2>/dev/null; then
+
+            aws s3 rm \
+              s3://${OUTPUT_BUCKET} \
               --recursive \
               --region ${AWS_REGION}
+
           else
             echo "Output bucket already deleted. Skipping."
           fi
 
+      - name: Check pipeline stack
+        id: pipeline_stack
+        run: |
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name ${PIPELINE_STACK_NAME} \
+            --region ${AWS_REGION} \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+
+          echo "Pipeline stack status: ${STATUS}"
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+
+      - name: Delete pipeline stack
+        if: steps.pipeline_stack.outputs.status != 'NOT_FOUND'
+        run: |
+          aws cloudformation delete-stack \
+            --stack-name ${PIPELINE_STACK_NAME} \
+            --region ${AWS_REGION}
+
+      - name: Wait for pipeline stack deletion
+        if: steps.pipeline_stack.outputs.status != 'NOT_FOUND'
+        run: |
+          aws cloudformation wait stack-delete-complete \
+            --stack-name ${PIPELINE_STACK_NAME} \
+            --region ${AWS_REGION}
+
+      - name: Check storage stack
+        id: storage_stack
+        run: |
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name ${STORAGE_STACK_NAME} \
+            --region ${AWS_REGION} \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "NOT_FOUND")
+
+          echo "Storage stack status: ${STATUS}"
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+
       - name: Delete storage stack
+        if: steps.storage_stack.outputs.status != 'NOT_FOUND'
         run: |
           aws cloudformation delete-stack \
             --stack-name ${STORAGE_STACK_NAME} \
             --region ${AWS_REGION}
 
       - name: Wait for storage stack deletion
+        if: steps.storage_stack.outputs.status != 'NOT_FOUND'
         run: |
           aws cloudformation wait stack-delete-complete \
             --stack-name ${STORAGE_STACK_NAME} \

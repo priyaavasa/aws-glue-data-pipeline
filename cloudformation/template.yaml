@@ -206,7 +206,6 @@ Resources:
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:s3:::${InputBucketName}'
 
-
   S3NotificationFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -216,63 +215,139 @@ Resources:
       Timeout: 60
       Code:
         ZipFile: |
-          import json
-          import urllib.request
           import boto3
+          import cfnresponse
 
           s3 = boto3.client("s3")
-
-          def send_response(event, context, status, data):
-              response_body = json.dumps({
-                  "Status": status,
-                  "Reason": "See CloudWatch Logs",
-                  "PhysicalResourceId": context.log_stream_name,
-                  "StackId": event["StackId"],
-                  "RequestId": event["RequestId"],
-                  "LogicalResourceId": event["LogicalResourceId"],
-                  "Data": data
-              })
-
-              request = urllib.request.Request(
-                  event["ResponseURL"],
-                  data=response_body.encode("utf-8"),
-                  headers={"content-type": ""},
-                  method="PUT"
-              )
-
-              urllib.request.urlopen(request)
 
           def handler(event, context):
               bucket = event["ResourceProperties"]["BucketName"]
               lambda_arn = event["ResourceProperties"]["LambdaArn"]
 
               try:
-                  if event["RequestType"] == "Delete":
-                      s3.put_bucket_notification_configuration(
-                          Bucket=bucket,
-                          NotificationConfiguration={}
+                  request_type = event["RequestType"]
+
+                  if request_type == "Delete":
+                      try:
+                          current = s3.get_bucket_notification_configuration(
+                              Bucket=bucket
+                          )
+                      except s3.exceptions.NoSuchBucket:
+                          cfnresponse.send(
+                              event,
+                              context,
+                              cfnresponse.SUCCESS,
+                              {}
+                          )
+                          return
+
+                      lambda_configs = current.get(
+                          "LambdaFunctionConfigurations",
+                          []
                       )
-                  else:
+
+                      remaining_lambda_configs = [
+                          config
+                          for config in lambda_configs
+                          if config.get("LambdaFunctionArn") != lambda_arn
+                      ]
+
+                      notification_configuration = {}
+
+                      if remaining_lambda_configs:
+                          notification_configuration[
+                              "LambdaFunctionConfigurations"
+                          ] = remaining_lambda_configs
+
+                      if current.get("QueueConfigurations"):
+                          notification_configuration[
+                              "QueueConfigurations"
+                          ] = current["QueueConfigurations"]
+
+                      if current.get("TopicConfigurations"):
+                          notification_configuration[
+                              "TopicConfigurations"
+                          ] = current["TopicConfigurations"]
+
+                      if current.get("EventBridgeConfiguration"):
+                          notification_configuration[
+                              "EventBridgeConfiguration"
+                          ] = current["EventBridgeConfiguration"]
+
                       s3.put_bucket_notification_configuration(
                           Bucket=bucket,
-                          NotificationConfiguration={
-                              "LambdaFunctionConfigurations": [
-                                  {
-                                      "LambdaFunctionArn": lambda_arn,
-                                      "Events": ["s3:ObjectCreated:*"]
-                                  }
-                              ]
+                          NotificationConfiguration=notification_configuration
+                      )
+
+                  else:
+                      current = s3.get_bucket_notification_configuration(
+                          Bucket=bucket
+                      )
+
+                      lambda_configs = current.get(
+                          "LambdaFunctionConfigurations",
+                          []
+                      )
+
+                      lambda_configs = [
+                          config
+                          for config in lambda_configs
+                          if config.get("LambdaFunctionArn") != lambda_arn
+                      ]
+
+                      lambda_configs.append(
+                          {
+                              "LambdaFunctionArn": lambda_arn,
+                              "Events": ["s3:ObjectCreated:*"]
                           }
                       )
 
-                  send_response(event, context, "SUCCESS", {})
+                      notification_configuration = {}
 
-              except Exception as error:
-                  send_response(
+                      if lambda_configs:
+                          notification_configuration[
+                              "LambdaFunctionConfigurations"
+                          ] = lambda_configs
+
+                      if current.get("QueueConfigurations"):
+                          notification_configuration[
+                              "QueueConfigurations"
+                          ] = current["QueueConfigurations"]
+
+                      if current.get("TopicConfigurations"):
+                          notification_configuration[
+                              "TopicConfigurations"
+                          ] = current["TopicConfigurations"]
+
+                      if current.get("EventBridgeConfiguration"):
+                          notification_configuration[
+                              "EventBridgeConfiguration"
+                          ] = current["EventBridgeConfiguration"]
+
+                      s3.put_bucket_notification_configuration(
+                          Bucket=bucket,
+                          NotificationConfiguration=notification_configuration
+                      )
+
+                  cfnresponse.send(
                       event,
                       context,
-                      "FAILED",
-                      {"Error": str(error)}
+                      cfnresponse.SUCCESS,
+                      {},
+                      "S3Notification-" + bucket
+                  )
+
+              except Exception as error:
+                  print(f"Error configuring S3 notification: {error}")
+
+                  cfnresponse.send(
+                      event,
+                      context,
+                      cfnresponse.FAILED,
+                      {
+                          "Error": str(error)
+                      },
+                      "S3Notification-" + bucket
                   )
 
 

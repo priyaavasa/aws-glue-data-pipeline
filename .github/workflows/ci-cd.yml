@@ -3,6 +3,12 @@ name: Deploy AWS Pipeline
 on:
   workflow_dispatch:
 
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/*.csv'
+
 permissions:
   id-token: write
   contents: read
@@ -79,7 +85,17 @@ jobs:
               JobName=sales-cfn-transformation-job \
               DatabaseName=sales_cfn_pipeline_db
 
+      - name: Upload CSV data
+        run: |
+          for file in data/*.csv; do
+            if [ -f "$file" ]; then
+              aws s3 cp \
+                "$file" \
+                "s3://${INPUT_BUCKET}/$(basename "$file")" \
+                --region ${AWS_REGION}
+            fi
+          done
 
       - name: Deployment completed
         run: |
-          echo "CloudFormation verification pipeline deployed successfully."
+          echo "CloudFormation pipeline deployed and CSV data uploaded successfully."
