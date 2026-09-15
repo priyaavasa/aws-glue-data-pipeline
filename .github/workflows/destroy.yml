@@ -9,6 +9,7 @@ permissions:
 
 env:
   AWS_REGION: ap-south-1
+  PIPELINE_STACK_NAME: sales-cfn-pipeline-stack
   STORAGE_STACK_NAME: sales-cfn-storage-stack
   INPUT_BUCKET: priya-cfn-glue-input-2026
   OUTPUT_BUCKET: priya-cfn-glue-output-2026
@@ -24,6 +25,22 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::719287408908:role/GitHubActionsDeployRole
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Delete pipeline stack
+        run: |
+          if aws cloudformation describe-stacks \
+            --stack-name ${PIPELINE_STACK_NAME} \
+            --region ${AWS_REGION} >/dev/null 2>&1; then
+            aws cloudformation delete-stack \
+              --stack-name ${PIPELINE_STACK_NAME} \
+              --region ${AWS_REGION}
+            
+            aws cloudformation wait stack-delete-complete \
+              --stack-name ${PIPELINE_STACK_NAME} \
+              --region ${AWS_REGION}
+          else
+            echo "Pipeline stack already deleted. Skipping."
+          fi
 
       - name: Empty CFN input bucket
         run: |
@@ -57,15 +74,19 @@ jobs:
 
       - name: Delete storage stack
         run: |
-          aws cloudformation delete-stack \
+          if aws cloudformation describe-stacks \
             --stack-name ${STORAGE_STACK_NAME} \
-            --region ${AWS_REGION}
-
-      - name: Wait for storage stack deletion
-        run: |
-          aws cloudformation wait stack-delete-complete \
-            --stack-name ${STORAGE_STACK_NAME} \
-            --region ${AWS_REGION}
+            --region ${AWS_REGION} >/dev/null 2>&1; then
+            aws cloudformation delete-stack \
+              --stack-name ${STORAGE_STACK_NAME} \
+              --region ${AWS_REGION}
+            
+            aws cloudformation wait stack-delete-complete \
+              --stack-name ${STORAGE_STACK_NAME} \
+              --region ${AWS_REGION}
+          else
+            echo "Storage stack already deleted. Skipping."
+          fi
 
       - name: Destroy completed
         run: |
