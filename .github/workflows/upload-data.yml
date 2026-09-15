@@ -1,0 +1,41 @@
+name: Upload Data to S3
+
+on:
+  push:
+    paths:
+      - 'data/*.csv'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  INPUT_BUCKET: priya-cfn-glue-input-2026
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::719287408908:role/GitHubActionsDeployRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload CSV files
+        run: |
+          for file in data/*.csv; do
+            if [ -f "$file" ]; then
+              aws s3 cp "$file" "s3://${INPUT_BUCKET}/"
+            fi
+          done
+
+      - name: Upload completed
+        run: |
+          echo "CSV files uploaded successfully."
