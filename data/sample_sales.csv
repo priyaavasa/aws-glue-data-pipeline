@@ -13,4 +13,4 @@ order_id,customer_name,product,category,quantity,unit_price,status,order_date,ci
 1012,Sneha Iyer,Mouse Pad,Accessories,4,15.0,PENDING,2026-09-06,Bengaluru
 1013,Karan Patel,Laptop Stand,Accessories,2,40.0,completed,2026-09-07,Ahmedabad
 1014,Riya Kapoor,Office Table,Furniture,1,210.0,shipped,2026-09-07,Pune
-1015,Amit Verma,Laptop,Electronics,1,920.0,COMPLETED,2026-09-07,Hyderabad
+
