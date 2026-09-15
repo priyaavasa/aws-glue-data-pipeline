@@ -1,9 +1,6 @@
 name: Upload Data to S3
 
 on:
-  push:
-    paths:
-      - 'data/*.csv'
   workflow_dispatch:
 
 permissions:
@@ -38,4 +35,4 @@ jobs:
 
       - name: Upload completed
         run: |
-          echo "CSV files uploaded successfully."
+          echo "CSV files uploaded to the S3 input bucket."
